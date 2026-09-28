@@ -1,4 +1,4 @@
-import axiosInstance from "./Axiosinstance";
+import axiosInstance from "./axiosInstance";
 
 // Adjust these paths/params if your backend's video routes differ.
 

@@ -1,4 +1,4 @@
-import axiosInstance from "./Axiosinstance";
+import axiosInstance from "./axiosInstance";
 
 // Adjust these paths if your backend's dashboard routes differ.
 
