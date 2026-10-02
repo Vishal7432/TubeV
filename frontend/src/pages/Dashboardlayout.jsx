@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { getCurrentUser } from "../apis/Auth.api.js";
+import UserMenu from "../components/layout/UserMenu";
 
 const navItems = [
   { to: "/", label: "Overview", icon: "◐" },
@@ -6,6 +9,14 @@ const navItems = [
 ];
 
 export default function DashboardLayout() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#14151A] text-[#F2F3F5] flex">
       {/* Sidebar */}
@@ -36,8 +47,11 @@ export default function DashboardLayout() {
           ))}
         </nav>
 
-        <div className="px-6 py-4 border-t border-[#2C2F38] text-xs text-[#868C99]">
-          Signed in as <span className="text-[#F2F3F5]">Creator</span>
+        <div className="px-6 py-4 border-t border-[#2C2F38] text-xs text-[#868C99] truncate">
+          Signed in as{" "}
+          <span className="text-[#F2F3F5]">
+            {user?.fullName ?? user?.username ?? "…"}
+          </span>
         </div>
       </aside>
 
@@ -51,7 +65,7 @@ export default function DashboardLayout() {
             </span>
             Live data
           </div>
-          <div className="h-9 w-9 rounded-full bg-[#1D1F26] border border-[#2C2F38]" />
+          <UserMenu user={user} />
         </header>
 
         <main className="flex-1 px-8 py-8 max-w-6xl w-full mx-auto">

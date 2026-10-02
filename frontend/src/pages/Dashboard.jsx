@@ -1,16 +1,8 @@
 import { useEffect, useState } from "react";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
-import { getChannelStats, getChannelVideos } from "../api/channel.api";
+import { getChannelStats, getChannelVideos } from "../apis/Channel.api.js";
+import StatCard from "../components/dashboard/StatCard";
+import TopVideosList from "../components/dashboard/TopVideosList";
+import TrendChart from "../components/charts/Trendchart.jsx";
 
 // No history endpoint on this backend yet, so trend lines stay illustrative
 // until a time-series route exists. Swap these for real data once you add one.
@@ -33,19 +25,6 @@ const MOCK_SUB_TREND = [
   { day: "Sat", subs: 940 },
   { day: "Sun", subs: 981 },
 ];
-
-function StatBlock({ value, label }) {
-  return (
-    <div className="flex-1">
-      <div className="font-display text-4xl md:text-5xl tabular-nums tracking-tight">
-        {value}
-      </div>
-      <div className="mt-2 flex items-center gap-2 text-sm">
-        <span className="text-[#868C99]">{label}</span>
-      </div>
-    </div>
-  );
-}
 
 function formatCount(n) {
   if (n === undefined || n === null) return "—";
@@ -108,133 +87,41 @@ export default function Dashboard() {
         <p className="text-sm text-[#868C99] mt-1">Last 7 days, all videos</p>
       </div>
 
-      {/* Hero stat row */}
       <div className="flex flex-col sm:flex-row gap-8 pb-8 border-b border-[#2C2F38]">
-        <StatBlock
+        <StatCard
           value={loading ? "—" : formatCount(stats?.totalViews)}
           label="Total views"
         />
-        <StatBlock
+        <StatCard
           value={loading ? "—" : formatCount(stats?.totalSubscribers)}
           label="Subscribers"
         />
-        <StatBlock
+        <StatCard
           value={loading ? "—" : formatCount(stats?.totalLikes)}
           label="Total likes"
         />
       </div>
 
-      {/* Charts */}
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="border border-[#2C2F38] rounded-lg p-5">
-          <h2 className="text-sm text-[#868C99] mb-4">Views this week</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={MOCK_VIEWS_TREND}>
-              <CartesianGrid stroke="#2C2F38" vertical={false} />
-              <XAxis
-                dataKey="day"
-                stroke="#868C99"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="#868C99"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                width={40}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "#1D1F26",
-                  border: "1px solid #2C2F38",
-                  borderRadius: 8,
-                }}
-                labelStyle={{ color: "#F2F3F5" }}
-              />
-              <Line
-                type="monotone"
-                dataKey="views"
-                stroke="#2DD4BF"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="border border-[#2C2F38] rounded-lg p-5">
-          <h2 className="text-sm text-[#868C99] mb-4">Subscriber growth</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={MOCK_SUB_TREND}>
-              <defs>
-                <linearGradient id="subFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2DD4BF" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#2DD4BF" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="#2C2F38" vertical={false} />
-              <XAxis
-                dataKey="day"
-                stroke="#868C99"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="#868C99"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                width={40}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "#1D1F26",
-                  border: "1px solid #2C2F38",
-                  borderRadius: 8,
-                }}
-                labelStyle={{ color: "#F2F3F5" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="subs"
-                stroke="#2DD4BF"
-                fill="url(#subFill)"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        <TrendChart
+          title="Views this week"
+          data={MOCK_VIEWS_TREND}
+          xKey="day"
+          dataKey="views"
+          variant="line"
+        />
+        <TrendChart
+          title="Subscriber growth"
+          data={MOCK_SUB_TREND}
+          xKey="day"
+          dataKey="subs"
+          variant="area"
+        />
       </div>
 
-      {/* Top videos ranking */}
       <div>
         <h2 className="text-sm text-[#868C99] mb-4">Top performing videos</h2>
-        {loading ? (
-          <p className="text-sm text-[#868C99]">Loading…</p>
-        ) : (
-          <ol className="divide-y divide-[#2C2F38] border border-[#2C2F38] rounded-lg overflow-hidden">
-            {topVideos.map((v, i) => (
-              <li
-                key={v._id ?? i}
-                className="flex items-center gap-4 px-5 py-4"
-              >
-                <span className="font-display text-lg text-[#868C99] w-6">
-                  {i + 1}
-                </span>
-                <span className="flex-1 text-sm">{v.title}</span>
-                <span className="text-sm text-[#868C99] tabular-nums">
-                  {formatCount(v.views)} views
-                </span>
-                <span className="text-sm text-[#2DD4BF] tabular-nums">
-                  {formatCount(v.likesCount)} likes
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+        <TopVideosList videos={topVideos} loading={loading} />
       </div>
     </div>
   );

@@ -1,79 +1,133 @@
-import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { getVideoById } from "../apis/Vidoe.api.js";
+import { useEffect, useRef, useState } from "react";
+import { getAllVideos } from "../apis/Vidoe.api.js";
+import SearchBar from "../components/video/SearchBar";
+import FilterChips from "../components/video/FilterChips";
+import VideoCard from "../components/video/VideoCard";
 
-export default function VideoDetail() {
-  const { id } = useParams();
-  const [video, setVideo] = useState(null);
+const FILTERS = [
+  { label: "Newest", sortBy: "createdAt", sortType: "desc" },
+  { label: "Most viewed", sortBy: "views", sortType: "desc" },
+  { label: "Most liked", sortBy: "likesCount", sortType: "desc" },
+];
+
+function useDebouncedValue(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
+export default function ChannelVideos() {
+  const [query, setQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
+  const [videos, setVideos] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [totalDocs, setTotalDocs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const debouncedQuery = useDebouncedValue(query);
+  const sentinelRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getVideoById(id)
-      .then((data) => !cancelled && setVideo(data))
+    setError(null);
+
+    getAllVideos({
+      query: debouncedQuery,
+      sortBy: activeFilter.sortBy,
+      sortType: activeFilter.sortType,
+      page: 1,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setVideos(res.docs ?? []);
+        setHasNextPage(res.hasNextPage ?? false);
+        setTotalDocs(res.totalDocs ?? 0);
+        setPage(1);
+      })
       .catch((err) => !cancelled && setError(err))
       .finally(() => !cancelled && setLoading(false));
+
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [debouncedQuery, activeFilter]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          const nextPage = page + 1;
+          getAllVideos({
+            query: debouncedQuery,
+            sortBy: activeFilter.sortBy,
+            sortType: activeFilter.sortType,
+            page: nextPage,
+          }).then((res) => {
+            setVideos((prev) => [...prev, ...(res.docs ?? [])]);
+            setHasNextPage(res.hasNextPage ?? false);
+            setPage(nextPage);
+          });
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [page, hasNextPage, loading, debouncedQuery, activeFilter]);
 
   return (
-    <div className="max-w-3xl space-y-8">
-      <Link
-        to="/videos"
-        className="text-sm text-[#868C99] hover:text-[#F2F3F5]"
-      >
-        ← Back to videos
-      </Link>
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-2xl">Videos</h1>
+        <p className="text-sm text-[#868C99] mt-1">{totalDocs} results</p>
+      </div>
 
-      {loading && <p className="text-sm text-[#868C99]">Loading…</p>}
+      <SearchBar value={query} onChange={setQuery} />
+      <FilterChips
+        filters={FILTERS}
+        active={activeFilter}
+        onChange={setActiveFilter}
+      />
 
       {error && (
-        <p className="text-sm text-[#868C99]">Couldn&apos;t load this video.</p>
+        <p className="text-sm text-[#868C99]">
+          Couldn&apos;t load videos.{" "}
+          <button
+            onClick={() => setActiveFilter({ ...activeFilter })}
+            className="text-[#2DD4BF] underline"
+          >
+            Retry
+          </button>
+        </p>
       )}
 
-      {video && (
-        <>
-          <div className="aspect-video bg-[#1D1F26] border border-[#2C2F38] rounded-lg overflow-hidden">
-            {video.videoFile ? (
-              <video src={video.videoFile} controls className="w-full h-full" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[#868C99] text-sm">
-                Player unavailable
-              </div>
-            )}
-          </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {videos.map((video) => (
+          <VideoCard key={video._id} video={video} />
+        ))}
+      </div>
 
-          <div>
-            <h1 className="font-display text-xl">{video.title}</h1>
-            <div className="mt-2 flex items-center gap-4 text-sm text-[#868C99]">
-              <span className="tabular-nums">{video.views ?? 0} views</span>
-              <span>·</span>
-              <span>
-                {video.createdAt
-                  ? new Date(video.createdAt).toLocaleDateString()
-                  : ""}
-              </span>
-              <span className="ml-auto text-[#2DD4BF] tabular-nums">
-                {video.likesCount ?? 0} likes
-              </span>
-            </div>
-            <p className="mt-4 text-sm text-[#868C99] leading-relaxed">
-              {video.description}
-            </p>
-          </div>
+      {!loading && videos.length === 0 && !error && (
+        <p className="text-sm text-[#868C99] py-12 text-center">
+          No videos match &ldquo;{query}&rdquo;.
+        </p>
+      )}
 
-          {/* Comments: wire up once a getVideoComments endpoint is available. */}
-          <div>
-            <h2 className="text-sm text-[#868C99] mb-4">Comments</h2>
-            <p className="text-sm text-[#868C99]">
-              Comment loading not wired up yet.
-            </p>
-          </div>
-        </>
+      {hasNextPage && (
+        <div
+          ref={sentinelRef}
+          className="h-10 flex items-center justify-center text-xs text-[#868C99]"
+        >
+          Loading more…
+        </div>
       )}
     </div>
   );
