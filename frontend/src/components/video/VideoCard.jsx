@@ -1,101 +1,65 @@
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
+import { Link } from "react-router-dom";
+import { formatDuration, formatViews, timeAgo } from "../../utils/format";
 
-const tooltipStyle = {
-  contentStyle: {
-    background: "#1D1F26",
-    border: "1px solid #2C2F38",
-    borderRadius: 8,
-  },
-  labelStyle: { color: "#F2F3F5" },
-};
-
-/**
- * variant: "line" | "area"
- * data: [{ [xKey]: string, [dataKey]: number }]
- */
-export default function TrendChart({
-  title,
-  data,
-  xKey,
-  dataKey,
-  variant = "line",
-}) {
-  const gradientId = `${dataKey}-fill`;
+export default function VideoCard({ video }) {
+  // owner is populated as an object only if the backend does a $lookup on users.
+  const owner =
+    video.owner && typeof video.owner === "object" ? video.owner : null;
+  const channelName = owner?.username ?? "unknown";
+  const initial = channelName[0]?.toUpperCase() ?? "?";
 
   return (
-    <div className="border border-[#2C2F38] rounded-lg p-5">
-      <h2 className="text-sm text-[#868C99] mb-4">{title}</h2>
-      <ResponsiveContainer width="100%" height={220}>
-        {variant === "area" ? (
-          <AreaChart data={data}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2DD4BF" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#2DD4BF" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke="#2C2F38" vertical={false} />
-            <XAxis
-              dataKey={xKey}
-              stroke="#868C99"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
+    <div className="group">
+      <Link to={`/videos/${video._id}`} className="block">
+        <div className="aspect-video bg-[#1D1F26] rounded-lg overflow-hidden relative">
+          {video.thumbnail && (
+            <img
+              src={video.thumbnail}
+              alt=""
+              className="w-full h-full object-cover"
             />
-            <YAxis
-              stroke="#868C99"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-              width={40}
+          )}
+          {video.duration != null && (
+            <span className="absolute bottom-2 right-2 bg-black/75 text-[#F2F3F5] text-xs px-1.5 py-0.5 rounded tabular-nums">
+              {formatDuration(video.duration)}
+            </span>
+          )}
+        </div>
+      </Link>
+
+      <div className="flex gap-3 mt-3">
+        <Link
+          to={owner ? `/channel/${owner.username}` : "#"}
+          className="h-9 w-9 shrink-0 rounded-full bg-[#24262F] overflow-hidden flex items-center justify-center text-sm text-[#F2F3F5]"
+        >
+          {owner?.avatar ? (
+            <img
+              src={owner.avatar}
+              alt=""
+              className="h-full w-full object-cover"
             />
-            <Tooltip {...tooltipStyle} />
-            <Area
-              type="monotone"
-              dataKey={dataKey}
-              stroke="#2DD4BF"
-              fill={`url(#${gradientId})`}
-              strokeWidth={2}
-            />
-          </AreaChart>
-        ) : (
-          <LineChart data={data}>
-            <CartesianGrid stroke="#2C2F38" vertical={false} />
-            <XAxis
-              dataKey={xKey}
-              stroke="#868C99"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="#868C99"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-              width={40}
-            />
-            <Tooltip {...tooltipStyle} />
-            <Line
-              type="monotone"
-              dataKey={dataKey}
-              stroke="#2DD4BF"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        )}
-      </ResponsiveContainer>
+          ) : (
+            initial
+          )}
+        </Link>
+
+        <div className="min-w-0">
+          <Link to={`/videos/${video._id}`}>
+            <h3 className="text-sm leading-snug line-clamp-2 group-hover:text-[#2DD4BF] transition-colors">
+              {video.title}
+            </h3>
+          </Link>
+          <Link
+            to={owner ? `/channel/${owner.username}` : "#"}
+            className="block mt-1 text-xs text-[#868C99] hover:text-[#F2F3F5] truncate"
+          >
+            {channelName}
+          </Link>
+          <p className="text-xs text-[#868C99] tabular-nums">
+            {formatViews(video.views ?? 0)} views · {timeAgo(video.createdAt)}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

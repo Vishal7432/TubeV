@@ -7,7 +7,7 @@ export default function FilterChips({ filters, active, onChange }) {
           onClick={() => onChange(f)}
           className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
             active.label === f.label
-              ? "bg-[#2DD4BF] text-[#0B0C0F] border-[#2DD4BF]"
+              ? "bg-[#F2F3F5] text-[#14151A] border-[#F2F3F5]"
               : "border-[#2C2F38] text-[#868C99] hover:text-[#F2F3F5] hover:border-[#F2F3F5]/30"
           }`}
         >

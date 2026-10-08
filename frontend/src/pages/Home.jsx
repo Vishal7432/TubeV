@@ -1,52 +1,45 @@
 import { useEffect, useRef, useState } from "react";
-import { getAllVideos } from "../apis/Vidoe.api.js";
-import SearchBar from "../components/video/SearchBar";
+import { useSearchParams } from "react-router-dom";
+import { getAllVideos } from "../api/video.api";
 import FilterChips from "../components/video/FilterChips";
 import VideoCard from "../components/video/VideoCard";
 
 const FILTERS = [
-  { label: "Newest", sortBy: "createdAt", sortType: "desc" },
+  { label: "All", sortBy: "createdAt", sortType: "desc" },
   { label: "Most viewed", sortBy: "views", sortType: "desc" },
   { label: "Most liked", sortBy: "likesCount", sortType: "desc" },
+  { label: "Oldest", sortBy: "createdAt", sortType: "asc" },
 ];
 
-function useDebouncedValue(value, delay = 300) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
+export default function Home() {
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get("q") ?? "";
 
-export default function ChannelVideos() {
-  const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
   const [videos, setVideos] = useState([]);
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalDocs, setTotalDocs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const debouncedQuery = useDebouncedValue(query);
   const sentinelRef = useRef(null);
 
+  // Reload from page 1 whenever the search term or filter changes.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
 
     getAllVideos({
-      query: debouncedQuery,
+      query,
       sortBy: activeFilter.sortBy,
       sortType: activeFilter.sortType,
       page: 1,
+      limit: 12,
     })
       .then((res) => {
         if (cancelled) return;
         setVideos(res.docs ?? []);
         setHasNextPage(res.hasNextPage ?? false);
-        setTotalDocs(res.totalDocs ?? 0);
         setPage(1);
       })
       .catch((err) => !cancelled && setError(err))
@@ -55,47 +48,49 @@ export default function ChannelVideos() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, activeFilter]);
+  }, [query, activeFilter]);
 
+  // Infinite scroll: fetch the next page when the sentinel enters the viewport.
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || !hasNextPage || loading) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          const nextPage = page + 1;
-          getAllVideos({
-            query: debouncedQuery,
-            sortBy: activeFilter.sortBy,
-            sortType: activeFilter.sortType,
-            page: nextPage,
-          }).then((res) => {
-            setVideos((prev) => [...prev, ...(res.docs ?? [])]);
-            setHasNextPage(res.hasNextPage ?? false);
-            setPage(nextPage);
-          });
-        }
+        if (!entries[0].isIntersecting) return;
+        const nextPage = page + 1;
+        getAllVideos({
+          query,
+          sortBy: activeFilter.sortBy,
+          sortType: activeFilter.sortType,
+          page: nextPage,
+          limit: 12,
+        }).then((res) => {
+          setVideos((prev) => [...prev, ...(res.docs ?? [])]);
+          setHasNextPage(res.hasNextPage ?? false);
+          setPage(nextPage);
+        });
       },
       { rootMargin: "200px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [page, hasNextPage, loading, debouncedQuery, activeFilter]);
+  }, [page, hasNextPage, loading, query, activeFilter]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl">Videos</h1>
-        <p className="text-sm text-[#868C99] mt-1">{totalDocs} results</p>
-      </div>
-
-      <SearchBar value={query} onChange={setQuery} />
       <FilterChips
         filters={FILTERS}
         active={activeFilter}
         onChange={setActiveFilter}
       />
+
+      {query && (
+        <p className="text-sm text-[#868C99]">
+          Results for &ldquo;<span className="text-[#F2F3F5]">{query}</span>
+          &rdquo;
+        </p>
+      )}
 
       {error && (
         <p className="text-sm text-[#868C99]">
@@ -109,15 +104,17 @@ export default function ChannelVideos() {
         </p>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
         {videos.map((video) => (
           <VideoCard key={video._id} video={video} />
         ))}
       </div>
 
       {!loading && videos.length === 0 && !error && (
-        <p className="text-sm text-[#868C99] py-12 text-center">
-          No videos match &ldquo;{query}&rdquo;.
+        <p className="text-sm text-[#868C99] py-16 text-center">
+          {query
+            ? `No videos found for “${query}”.`
+            : "No videos yet. Be the first to upload one."}
         </p>
       )}
 

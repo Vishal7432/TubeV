@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { getChannelStats, getChannelVideos } from "../apis/Channel.api.js";
+import { getChannelStats, getChannelVideos } from "../api/channel.api";
 import StatCard from "../components/dashboard/StatCard";
 import TopVideosList from "../components/dashboard/TopVideosList";
-import TrendChart from "../components/charts/Trendchart.jsx";
+import TrendChart from "../components/charts/TrendChart";
 
 // No history endpoint on this backend yet, so trend lines stay illustrative
 // until a time-series route exists. Swap these for real data once you add one.
@@ -83,7 +83,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="font-display text-2xl">Overview</h1>
+        <h1 className="font-display text-2xl">Studio</h1>
         <p className="text-sm text-[#868C99] mt-1">Last 7 days, all videos</p>
       </div>
 
