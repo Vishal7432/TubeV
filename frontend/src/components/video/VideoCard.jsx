@@ -4,7 +4,8 @@ import { formatDuration, formatViews, timeAgo } from "../../utils/format";
 export default function VideoCard({ video }) {
   // owner is populated as an object only if the backend does a $lookup on users.
   const owner =
-    video.owner && typeof video.owner === "object" ? video.owner : null;
+    video.ownerDetails ??
+    (video.owner && typeof video.owner === "object" ? video.owner : null);
   const channelName = owner?.username ?? "unknown";
   const initial = channelName[0]?.toUpperCase() ?? "?";
 

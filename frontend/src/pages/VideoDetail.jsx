@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getVideoById } from "../api/video.api";
+import { getVideoById } from "../apis/Vidoe.api.js";
 import LikeButton from "../components/video/LikeButton";
 import CommentSection from "../components/video/CommentSection";
 

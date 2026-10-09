@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { getChannelStats, getChannelVideos } from "../api/channel.api";
+import { getChannelStats, getChannelVideos } from "../apis/Channel.api.js";
 import StatCard from "../components/dashboard/StatCard";
 import TopVideosList from "../components/dashboard/TopVideosList";
-import TrendChart from "../components/charts/TrendChart";
+import TrendChart from "../components/charts/Trendchart.jsx";
 
 // No history endpoint on this backend yet, so trend lines stay illustrative
 // until a time-series route exists. Swap these for real data once you add one.

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getAllVideos } from "../api/video.api";
+import { getAllVideos } from "../apis/Vidoe.api.js";
 import FilterChips from "../components/video/FilterChips";
 import VideoCard from "../components/video/VideoCard";
 

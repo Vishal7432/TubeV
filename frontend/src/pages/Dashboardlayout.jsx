@@ -5,7 +5,7 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
-import { getCurrentUser } from "../api/auth.api";
+import { getCurrentUser } from "../apis/Auth.api.js";
 import UserMenu from "../components/layout/UserMenu";
 
 function SidebarLink({ to, label, icon, end = false }) {
@@ -60,7 +60,7 @@ export default function DashboardLayout() {
 
           <div className="my-3 border-t border-[#2C2F38]" />
 
-          {user && (
+          {user?.username && (
             <SidebarLink
               to={`/channel/${user.username}`}
               label="Your channel"

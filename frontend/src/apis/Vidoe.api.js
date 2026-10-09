@@ -8,9 +8,10 @@ export async function getAllVideos({
   sortType = "desc",
   page = 1,
   limit = 8,
+  userId,
 } = {}) {
   const { data } = await axiosInstance.get("/videos", {
-    params: { query, sortBy, sortType, page, limit },
+    params: { query, sortBy, sortType, page, limit, userId },
   });
   // Typical shape: { data: { docs: [...], totalDocs, hasNextPage, ... } } (mongoose-aggregate-paginate-v2)
   return data.data;
