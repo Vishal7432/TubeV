@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import {
+  Link,
   NavLink,
   Outlet,
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
-import { getCurrentUser } from "../apis/Auth.api.js";
+import { getCurrentUser } from "../api/auth.api";
 import UserMenu from "../components/layout/UserMenu";
 
 function SidebarLink({ to, label, icon, end = false }) {
@@ -60,7 +61,7 @@ export default function DashboardLayout() {
 
           <div className="my-3 border-t border-[#2C2F38]" />
 
-          {user?.username && (
+          {user && (
             <SidebarLink
               to={`/channel/${user.username}`}
               label="Your channel"
@@ -92,7 +93,16 @@ export default function DashboardLayout() {
                          focus:ring-2 focus:ring-[#2DD4BF] focus:border-transparent"
             />
           </form>
-          <UserMenu user={user} />
+          <div className="flex items-center gap-4">
+            <Link
+              to="/upload"
+              className="flex items-center gap-1.5 bg-[#1D1F26] border border-[#2C2F38] hover:border-[#2DD4BF]/50
+                         rounded-full px-4 py-2 text-sm transition-colors"
+            >
+              <span aria-hidden="true">+</span> Create
+            </Link>
+            <UserMenu user={user} />
+          </div>
         </header>
 
         <main className="flex-1 px-8 py-6 max-w-7xl w-full mx-auto">
