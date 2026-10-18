@@ -6,7 +6,7 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
-import { getCurrentUser } from "../api/auth.api";
+import { getCurrentUser } from "../apis/Auth.api.js";
 import UserMenu from "../components/layout/UserMenu";
 
 function SidebarLink({ to, label, icon, end = false }) {

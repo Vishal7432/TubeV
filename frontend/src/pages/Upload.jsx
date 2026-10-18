@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { publishVideo } from "../api/video.api";
+import { publishVideo } from "../apis/Vidoe.api.js";
 
 const MAX_VIDEO_MB = 100; // matches the multer limit on the backend
 
