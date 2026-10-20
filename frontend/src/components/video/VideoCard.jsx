@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { formatDuration, formatViews, timeAgo } from "../../utils/format";
 
 export default function VideoCard({ video }) {
-  // owner is populated as an object only if the backend does a $lookup on users.
+  // The backend sends the channel info as "ownerDetails" (from a $lookup on users).
   const owner =
     video.ownerDetails ??
     (video.owner && typeof video.owner === "object" ? video.owner : null);
