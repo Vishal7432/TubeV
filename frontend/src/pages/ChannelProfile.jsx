@@ -1,256 +1,327 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  createChannelPost,
-  getChannelPosts,
-  getChannelProfile,
-} from "../apis/Channel.api.js";
-import { getCurrentUser } from "../apis/Auth.api.js";
+import { getChannelProfile } from "../apis/Channel.api.js";
 import { getAllVideos } from "../apis/Vidoe.api.js";
-import VideoCard from "../components/video/VideoCard.jsx";
+import { getCurrentUser } from "../apis/Auth.api.js";
+import Avatar from "../components/common/Avatar";
+import FilterChips from "../components/video/FilterChips";
+import SubscribeButton from "../components/video/SubscribeButton";
+import VideoCard from "../components/video/VideoCard";
 
-function formatCount(count = 0) {
-  return new Intl.NumberFormat().format(count);
+const FILTERS = [
+  { label: "Latest", sortBy: "createdAt", sortType: "desc" },
+  { label: "Popular", sortBy: "views", sortType: "desc" },
+  { label: "Oldest", sortBy: "createdAt", sortType: "asc" },
+];
+const PAGE_SIZE = 12;
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function Row({ label, value }) {
+  return (
+    <div className="flex justify-between border-b border-[#2C2F38] pb-3">
+      <dt className="text-[#868C99]">{label}</dt>
+      <dd className="tabular-nums">{value}</dd>
+    </div>
+  );
 }
 
 export default function ChannelProfile() {
   const { username } = useParams();
-  const [channel, setChannel] = useState(null);
+
+  const [currentUser, setCurrentUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [subscribersCount, setSubscribersCount] = useState(0);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(null);
+
+  const [tab, setTab] = useState("videos");
+  const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
   const [videos, setVideos] = useState([]);
-  const [posts, setPosts] = useState([]);
-  const [isOwnChannel, setIsOwnChannel] = useState(false);
-  const [postContent, setPostContent] = useState("");
-  const [postImage, setPostImage] = useState(null);
-  const [posting, setPosting] = useState(false);
-  const [postError, setPostError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [contentLoading, setContentLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [contentError, setContentError] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [totalVideos, setTotalVideos] = useState(null);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    getCurrentUser()
+      .then(setCurrentUser)
+      .catch(() => {});
+  }, []);
+
+  // Load the channel whenever the username in the URL changes.
+  useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError("");
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfile(null);
+    setTab("videos");
+    setActiveFilter(FILTERS[0]);
+    setVideos([]);
+    setTotalVideos(null);
+    window.scrollTo(0, 0);
 
-    async function loadChannel() {
-      try {
-        const [profile, currentUser] = await Promise.all([
-          getChannelProfile(username),
-          getCurrentUser(),
-        ]);
+    getChannelProfile(username)
+      .then((data) => {
         if (cancelled) return;
-        setChannel(profile);
-        setIsOwnChannel(currentUser?._id === profile._id);
-        setContentLoading(true);
-
-        try {
-          const [videoResult, channelPosts] = await Promise.all([
-            getAllVideos({ userId: profile._id, limit: 100 }),
-            getChannelPosts(profile._id),
-          ]);
-          if (cancelled) return;
-
-          setVideos(
-            Array.isArray(videoResult)
-              ? videoResult
-              : (videoResult?.docs ?? []),
-          );
-          setPosts(Array.isArray(channelPosts) ? channelPosts : []);
-        } catch {
-          if (!cancelled) {
-            setContentError("Could not load this channel's uploads.");
-          }
-        }
-      } catch {
-        if (!cancelled) setError("Could not load this channel.");
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-          setContentLoading(false);
-        }
-      }
-    }
-
-    loadChannel();
+        setProfile(data);
+        setSubscribersCount(data.subscribersCount ?? 0);
+      })
+      .catch((err) => !cancelled && setProfileError(err))
+      .finally(() => !cancelled && setProfileLoading(false));
 
     return () => {
       cancelled = true;
     };
   }, [username]);
 
-  async function handleCreatePost(event) {
-    event.preventDefault();
-    if (posting || (!postContent.trim() && !postImage)) return;
+  // Load the first page of this channel's videos (and again when the sort changes).
+  useEffect(() => {
+    if (!profile?._id) return;
+    let cancelled = false;
+    setVideosLoading(true);
 
-    const form = event.currentTarget;
-    setPosting(true);
-    setPostError("");
+    getAllVideos({
+      userId: profile._id,
+      sortBy: activeFilter.sortBy,
+      sortType: activeFilter.sortType,
+      page: 1,
+      limit: PAGE_SIZE,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setVideos(res.docs ?? []);
+        setHasNextPage(res.hasNextPage ?? false);
+        setTotalVideos(res.totalDocs ?? 0);
+        setPage(1);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setVideosLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?._id, activeFilter]);
+
+  async function loadMore() {
+    setLoadingMore(true);
     try {
-      const post = await createChannelPost({
-        content: postContent,
-        image: postImage,
+      const nextPage = page + 1;
+      const res = await getAllVideos({
+        userId: profile._id,
+        sortBy: activeFilter.sortBy,
+        sortType: activeFilter.sortType,
+        page: nextPage,
+        limit: PAGE_SIZE,
       });
-      setPosts((current) => [post, ...current]);
-      setPostContent("");
-      setPostImage(null);
-      form.reset();
-    } catch {
-      setPostError("Could not publish your post. Please try again.");
+      setVideos((prev) => [...prev, ...(res.docs ?? [])]);
+      setHasNextPage(res.hasNextPage ?? false);
+      setPage(nextPage);
     } finally {
-      setPosting(false);
+      setLoadingMore(false);
     }
   }
 
-  if (loading) {
+  if (profileLoading)
     return <p className="text-sm text-[#868C99]">Loading channel…</p>;
-  }
 
-  if (error || !channel) {
+  if (profileError || !profile) {
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-[#868C99]">
-          {error || "This channel could not be found."}
+      <div className="py-16 text-center">
+        <p className="font-display text-xl">This channel doesn&apos;t exist</p>
+        <p className="text-sm text-[#868C99] mt-2">
+          We couldn&apos;t find @{username}. Check the link and try again.
         </p>
-        <Link to="/" className="text-sm text-[#2DD4BF] underline">
+        <Link
+          to="/"
+          className="inline-block mt-6 text-sm text-[#2DD4BF] hover:underline"
+        >
           Back to home
         </Link>
       </div>
     );
   }
 
+  const isOwner =
+    currentUser &&
+    (String(currentUser._id) === String(profile._id) ||
+      currentUser.username === profile.username);
+  const displayName = profile.fullName ?? profile.username;
+
   return (
-    <section className="space-y-6">
-      {channel.coverImage && (
-        <img
-          src={channel.coverImage}
-          alt=""
-          className="h-40 w-full rounded-lg object-cover"
-        />
-      )}
-      <div className="flex items-center gap-4">
-        {channel.avatar && (
+    <div>
+      {/* Cover */}
+      <div
+        className="h-32 sm:h-48 rounded-xl overflow-hidden"
+        style={{
+          background: "linear-gradient(120deg,#1D3B3A,#24262F 60%,#14151A)",
+        }}
+      >
+        {profile.coverImage && (
           <img
-            src={channel.avatar}
+            src={profile.coverImage}
             alt=""
-            className="h-16 w-16 rounded-full object-cover"
+            className="h-full w-full object-cover"
           />
         )}
-        <div>
-          <h1 className="font-display text-2xl">
-            {channel.fullName || channel.username}
-          </h1>
-          <p className="text-sm text-[#868C99]">@{channel.username}</p>
+      </div>
+
+      {/* Identity row */}
+      <div className="-mt-10 sm:-mt-12 px-2 sm:px-4 flex flex-wrap items-end gap-4">
+        <Avatar
+          user={profile}
+          className="h-20 w-20 sm:h-24 sm:w-24 text-3xl ring-4 ring-[#14151A]"
+        />
+        <div className="min-w-0 pb-1">
+          <h1 className="font-display text-2xl truncate">{displayName}</h1>
+          <p className="text-sm text-[#868C99] tabular-nums">
+            @{profile.username} · {plural(subscribersCount, "subscriber")}
+            {totalVideos !== null && ` · ${plural(totalVideos, "video")}`}
+          </p>
+        </div>
+
+        <div className="ml-auto flex items-center gap-3 pb-1">
+          {isOwner ? (
+            <>
+              <Link
+                to="/upload"
+                className="px-4 py-2 rounded-full text-sm font-medium bg-[#2DD4BF] text-[#0B0C0F] hover:bg-[#2DD4BF]/90 transition-colors"
+              >
+                Upload
+              </Link>
+              <Link
+                to="/studio"
+                className="px-4 py-2 rounded-full text-sm border border-[#2C2F38] hover:border-[#F2F3F5]/30 transition-colors"
+              >
+                Studio
+              </Link>
+            </>
+          ) : (
+            currentUser && (
+              <SubscribeButton
+                key={profile._id}
+                channelId={profile._id}
+                initialSubscribed={profile.isSubscribed ?? false}
+                onToggle={(subscribed) =>
+                  setSubscribersCount((n) => n + (subscribed ? 1 : -1))
+                }
+              />
+            )
+          )}
         </div>
       </div>
-      <div className="flex flex-wrap gap-x-6 gap-y-2 border-y border-[#2C2F38] py-4 text-sm text-[#868C99]">
-        <span>{formatCount(channel.subscribersCount)} subscribers</span>
-        <span>
-          {formatCount(channel.channelsSubscribedToCount)} subscriptions
-        </span>
+
+      {/* Tabs */}
+      <div className="flex gap-6 border-b border-[#2C2F38] mt-6">
+        {[
+          { id: "videos", label: "Videos" },
+          { id: "about", label: "About" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`pb-3 -mb-px text-sm border-b-2 transition-colors ${
+              tab === t.id
+                ? "border-[#2DD4BF] text-[#F2F3F5]"
+                : "border-transparent text-[#868C99] hover:text-[#F2F3F5]"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div className="space-y-8">
-        <section className="space-y-4">
-          <h2 className="font-display text-xl">Videos</h2>
-          {contentLoading ? (
-            <p className="text-sm text-[#868C99]">Loading videos…</p>
-          ) : videos.length ? (
-            <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {videos.map((video) => (
-                <VideoCard key={video._id} video={video} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-[#868C99]">No videos uploaded yet.</p>
+      {/* Tab content */}
+      {tab === "videos" ? (
+        <div className="mt-6 space-y-6">
+          {totalVideos !== 0 && (
+            <FilterChips
+              filters={FILTERS}
+              active={activeFilter}
+              onChange={setActiveFilter}
+            />
           )}
-        </section>
 
-        <section className="space-y-4">
-          <h2 className="font-display text-xl">Posts</h2>
-          {isOwnChannel && (
-            <form
-              onSubmit={handleCreatePost}
-              className="space-y-3 rounded-lg border border-[#2C2F38] bg-[#1D1F26] p-4"
-            >
-              <textarea
-                value={postContent}
-                onChange={(event) => setPostContent(event.target.value)}
-                maxLength={2000}
-                placeholder="Share a post with your channel…"
-                aria-label="Post text"
-                className="min-h-24 w-full resize-y rounded-md border border-[#2C2F38] bg-[#14151A] p-3 text-sm text-[#F2F3F5] placeholder:text-[#868C99] focus:outline-none focus:ring-2 focus:ring-[#2DD4BF]"
-              />
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <label className="cursor-pointer text-sm text-[#2DD4BF]">
-                  Add image
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-                    className="sr-only"
-                    onChange={(event) =>
-                      setPostImage(event.target.files?.[0] ?? null)
-                    }
-                  />
-                </label>
-                <span className="text-xs text-[#868C99]">
-                  {postImage?.name ?? "Text or image required"}
-                </span>
-                <button
-                  type="submit"
-                  disabled={posting || (!postContent.trim() && !postImage)}
-                  className="rounded-md bg-[#2DD4BF] px-4 py-2 text-sm font-medium text-[#14151A] disabled:opacity-50"
-                >
-                  {posting ? "Posting…" : "Post"}
-                </button>
-              </div>
-              {postError && (
-                <p role="alert" className="text-sm text-red-400">
-                  {postError}
+          {videosLoading && videos.length === 0 && (
+            <p className="text-sm text-[#868C99]">Loading videos…</p>
+          )}
+
+          {!videosLoading && totalVideos === 0 && (
+            <div className="py-16 text-center">
+              {isOwner ? (
+                <>
+                  <p className="font-display text-lg">
+                    You haven&apos;t uploaded anything yet
+                  </p>
+                  <p className="text-sm text-[#868C99] mt-2">
+                    Your first video will show up here.
+                  </p>
+                  <Link
+                    to="/upload"
+                    className="inline-block mt-5 px-5 py-2 rounded-full text-sm font-medium bg-[#2DD4BF] text-[#0B0C0F] hover:bg-[#2DD4BF]/90 transition-colors"
+                  >
+                    Upload your first video
+                  </Link>
+                </>
+              ) : (
+                <p className="text-sm text-[#868C99]">
+                  {displayName} hasn&apos;t uploaded any videos yet.
                 </p>
               )}
-            </form>
+            </div>
           )}
-          {contentLoading ? (
-            <p className="text-sm text-[#868C99]">Loading posts…</p>
-          ) : posts.length ? (
-            <ul className="space-y-3">
-              {posts.map((post) => (
-                <li
-                  key={post._id}
-                  className="rounded-lg border border-[#2C2F38] bg-[#1D1F26] p-4"
-                >
-                  {post.content && (
-                    <p className="whitespace-pre-wrap text-sm">
-                      {post.content}
-                    </p>
-                  )}
-                  {post.image && (
-                    <img
-                      src={post.image}
-                      alt={`Post by @${channel.username}`}
-                      className="mt-3 max-h-[32rem] w-full rounded-md object-contain"
-                    />
-                  )}
-                  <time
-                    className="mt-3 block text-xs text-[#868C99]"
-                    dateTime={post.createdAt}
-                  >
-                    {new Date(post.createdAt).toLocaleDateString()}
-                  </time>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-[#868C99]">No posts yet.</p>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
+            {videos.map((video) => (
+              <VideoCard key={video._id} video={video} hideChannel />
+            ))}
+          </div>
+
+          {hasNextPage && (
+            <div className="text-center">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="px-5 py-2 rounded-full text-sm border border-[#2C2F38] hover:border-[#F2F3F5]/30 transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? "Loading…" : "Show more videos"}
+              </button>
+            </div>
           )}
-        </section>
-        {contentError && (
-          <p role="alert" className="text-sm text-red-400">
-            {contentError}
-          </p>
-        )}
-      </div>
-    </section>
+        </div>
+      ) : (
+        <dl className="mt-6 grid gap-4 max-w-md text-sm">
+          <Row label="Username" value={`@${profile.username}`} />
+          <Row label="Subscribers" value={subscribersCount} />
+          {profile.totalViews != null && (
+            <Row
+              label="Total views"
+              value={profile.totalViews.toLocaleString()}
+            />
+          )}
+          <Row
+            label="Videos"
+            value={totalVideos ?? profile.videosCount ?? "—"}
+          />
+          {profile.channelsSubscribedToCount != null && (
+            <Row
+              label="Subscribed to"
+              value={profile.channelsSubscribedToCount}
+            />
+          )}
+          {profile.createdAt && (
+            <Row
+              label="Joined"
+              value={new Date(profile.createdAt).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            />
+          )}
+        </dl>
+      )}
+    </div>
   );
 }

@@ -7,7 +7,7 @@ import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import VideoDetail from "./pages/VideoDetail";
 import Upload from "./pages/Upload";
-// import ChannelProfile from "./pages/ChannelProfile"; // next step
+import ChannelProfile from "./pages/ChannelProfile";
 
 export default function App() {
   return (
@@ -22,7 +22,7 @@ export default function App() {
             <Route path="/studio" element={<Dashboard />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/videos/:id" element={<VideoDetail />} />
-            {/* <Route path="/channel/:username" element={<ChannelProfile />} /> */}
+            <Route path="/channel/:username" element={<ChannelProfile />} />
           </Route>
         </Route>
       </Routes>
