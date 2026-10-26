@@ -1,8 +1,8 @@
 import axios from "axios";
 
-// Set VITE_API_BASE_URL in a .env file, e.g.:
+// Set VITE_API_BASE_URL in frontend/.env, e.g.:
 // VITE_API_BASE_URL=https://social-media-backend-mxz5.onrender.com/api/v1
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
