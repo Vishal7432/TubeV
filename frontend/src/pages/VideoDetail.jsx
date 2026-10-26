@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getAllVideos, getVideoById } from "../apis/Vidoe.api.js";
+import {
+  getAllVideos,
+  getVideoById,
+  recordVideoView,
+} from "../apis/Vidoe.api.js";
 import { getCurrentUser } from "../apis/Auth.api.js";
 import Avatar from "../components/common/Avatar";
 import LikeButton from "../components/video/LikeButton";
@@ -34,22 +38,117 @@ export default function VideoDetail() {
   const [subscribersCount, setSubscribersCount] = useState(0);
   const [currentUser, setCurrentUser] = useState(null);
   const [related, setRelated] = useState([]);
+  const [relatedPage, setRelatedPage] = useState(1);
+  const [relatedHasNextPage, setRelatedHasNextPage] = useState(false);
+  const [relatedLoading, setRelatedLoading] = useState(true);
+  const [relatedError, setRelatedError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const relatedAsideRef = useRef(null);
+  const relatedSentinelRef = useRef(null);
+  const relatedLoadingRef = useRef(false);
+  const viewRecordedRef = useRef(false);
+  const [viewError, setViewError] = useState(null);
 
   useEffect(() => {
     getCurrentUser()
       .then(setCurrentUser)
       .catch(() => {});
-    getAllVideos({ limit: 12 })
-      .then((res) => setRelated(res.docs ?? []))
-      .catch(() => {});
+
+    let cancelled = false;
+    setRelatedLoading(true);
+    getAllVideos({ page: 1, limit: 12 })
+      .then((res) => {
+        if (cancelled) return;
+        setRelated(res.docs ?? []);
+        setRelatedHasNextPage(res.hasNextPage ?? false);
+        setRelatedPage(1);
+        setRelatedError(false);
+      })
+      .catch(() => !cancelled && setRelatedError(true))
+      .finally(() => !cancelled && setRelatedLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  async function loadMoreRelated() {
+    if (relatedLoadingRef.current || !relatedHasNextPage) return;
+
+    relatedLoadingRef.current = true;
+    setRelatedLoading(true);
+    setRelatedError(false);
+    const nextPage = relatedPage + 1;
+
+    try {
+      const res = await getAllVideos({ page: nextPage, limit: 12 });
+      setRelated((videos) => [...videos, ...(res.docs ?? [])]);
+      setRelatedHasNextPage(res.hasNextPage ?? false);
+      setRelatedPage(nextPage);
+    } catch {
+      setRelatedError(true);
+    } finally {
+      relatedLoadingRef.current = false;
+      setRelatedLoading(false);
+    }
+  }
+
+  async function retryRelated() {
+    if (related.length > 0) {
+      loadMoreRelated();
+      return;
+    }
+    if (relatedLoadingRef.current) return;
+
+    relatedLoadingRef.current = true;
+    setRelatedLoading(true);
+    setRelatedError(false);
+    try {
+      const res = await getAllVideos({ page: 1, limit: 12 });
+      setRelated(res.docs ?? []);
+      setRelatedHasNextPage(res.hasNextPage ?? false);
+      setRelatedPage(1);
+    } catch {
+      setRelatedError(true);
+    } finally {
+      relatedLoadingRef.current = false;
+      setRelatedLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const root = relatedAsideRef.current;
+    const sentinel = relatedSentinelRef.current;
+    if (
+      !root ||
+      !sentinel ||
+      !relatedHasNextPage ||
+      relatedLoading ||
+      relatedError
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMoreRelated();
+      },
+      {
+        root: window.matchMedia("(min-width: 1024px)").matches ? root : null,
+        rootMargin: "200px",
+      },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [relatedHasNextPage, relatedLoading, relatedError, relatedPage]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    viewRecordedRef.current = false;
+    setViewError(null);
     window.scrollTo(0, 0);
 
     getVideoById(id)
@@ -65,6 +164,21 @@ export default function VideoDetail() {
       cancelled = true;
     };
   }, [id]);
+
+  async function handleVideoPlay() {
+    if (viewRecordedRef.current) return;
+    viewRecordedRef.current = true;
+    setViewError(null);
+
+    try {
+      await recordVideoView(id);
+    } catch (err) {
+      viewRecordedRef.current = false;
+      setViewError(
+        err.response?.data?.message ?? "Could not record this video view.",
+      );
+    }
+  }
 
   if (loading) return <p className="text-sm text-[#868C99]">Loading…</p>;
 
@@ -82,10 +196,10 @@ export default function VideoDetail() {
   const owner = video.ownerDetails;
   const isOwnVideo =
     currentUser && owner && String(currentUser._id) === String(owner._id);
-  const upNext = related.filter((v) => v._id !== video._id).slice(0, 8);
+  const upNext = related.filter((v) => v._id !== video._id);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid min-w-0 gap-6 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-5">
         {/* Player */}
         <div className="aspect-video bg-black rounded-xl overflow-hidden">
@@ -94,9 +208,15 @@ export default function VideoDetail() {
             src={video.videoFile}
             poster={video.thumbnail}
             controls
+            onPlay={handleVideoPlay}
             className="h-full w-full"
           />
         </div>
+        {viewError && (
+          <p role="status" className="text-xs text-[#FF4757]">
+            {viewError}
+          </p>
+        )}
 
         <h1 className="font-display text-xl leading-snug">{video.title}</h1>
 
@@ -157,11 +277,26 @@ export default function VideoDetail() {
       </div>
 
       {/* Up next */}
-      <aside className="space-y-4">
+      <aside
+        ref={relatedAsideRef}
+        className="scrollbar-hidden space-y-4 lg:sticky lg:top-0 lg:h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain"
+      >
         <h2 className="text-sm text-[#868C99]">Up next</h2>
         {upNext.map((v) => (
           <RelatedVideoItem key={v._id} video={v} />
         ))}
+        {relatedError && (
+          <div className="text-xs text-[#868C99]">
+            Couldn&apos;t load more videos.{" "}
+            <button onClick={retryRelated} className="text-[#2DD4BF] underline">
+              Retry
+            </button>
+          </div>
+        )}
+        {relatedLoading && (
+          <p className="text-xs text-[#868C99]">Loading suggestions…</p>
+        )}
+        <div ref={relatedSentinelRef} aria-hidden="true" className="h-px" />
       </aside>
     </div>
   );

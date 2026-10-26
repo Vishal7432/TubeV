@@ -22,6 +22,11 @@ export async function getVideoById(videoId) {
   return data.data;
 }
 
+export async function recordVideoView(videoId) {
+  const { data } = await axiosInstance.post(`/videos/${videoId}/view`);
+  return data.data;
+}
+
 export async function publishVideo(formData, onProgress) {
   // formData fields: title, description, videoFile, thumbnail
   const { data } = await axiosInstance.post("/videos", formData, {

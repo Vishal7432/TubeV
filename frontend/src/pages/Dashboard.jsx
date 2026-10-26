@@ -4,28 +4,6 @@ import StatCard from "../components/dashboard/StatCard";
 import TopVideosList from "../components/dashboard/TopVideosList";
 import TrendChart from "../components/charts/Trendchart.jsx";
 
-// No history endpoint on this backend yet, so trend lines stay illustrative
-// until a time-series route exists. Swap these for real data once you add one.
-const MOCK_VIEWS_TREND = [
-  { day: "Mon", views: 1200 },
-  { day: "Tue", views: 1900 },
-  { day: "Wed", views: 1700 },
-  { day: "Thu", views: 2400 },
-  { day: "Fri", views: 2100 },
-  { day: "Sat", views: 3000 },
-  { day: "Sun", views: 3400 },
-];
-
-const MOCK_SUB_TREND = [
-  { day: "Mon", subs: 820 },
-  { day: "Tue", subs: 834 },
-  { day: "Wed", subs: 851 },
-  { day: "Thu", subs: 879 },
-  { day: "Fri", subs: 902 },
-  { day: "Sat", subs: 940 },
-  { day: "Sun", subs: 981 },
-];
-
 function formatCount(n) {
   if (n === undefined || n === null) return "—";
   if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
@@ -34,7 +12,7 @@ function formatCount(n) {
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
-  const [topVideos, setTopVideos] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -51,8 +29,8 @@ export default function Dashboard() {
         setStats(statsData);
         const ranked = [...videos]
           .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
-          .slice(0, 5);
-        setTopVideos(ranked);
+          .slice(0, 6);
+        setVideos(ranked);
       } catch (err) {
         if (!cancelled) setError(err);
       } finally {
@@ -81,47 +59,66 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-10">
-      <div>
-        <h1 className="font-display text-2xl">Studio</h1>
-        <p className="text-sm text-[#868C99] mt-1">Last 7 days, all videos</p>
+    <div className="space-y-8 sm:space-y-10">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#2DD4BF]">
+            Creator studio
+          </p>
+          <h1 className="mt-2 font-display text-2xl sm:text-3xl">
+            Channel overview
+          </h1>
+          <p className="mt-1 text-sm text-[#868C99]">
+            Real performance from your videos and audience
+          </p>
+        </div>
+        {videos.length > 0 && (
+          <p className="text-xs text-[#868C99]">
+            Showing your top {videos.length} videos
+          </p>
+        )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-8 pb-8 border-b border-[#2C2F38]">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           value={loading ? "—" : formatCount(stats?.totalViews)}
           label="Total views"
+          icon="▶"
         />
         <StatCard
           value={loading ? "—" : formatCount(stats?.totalSubscribers)}
           label="Subscribers"
+          icon="◉"
         />
         <StatCard
           value={loading ? "—" : formatCount(stats?.totalLikes)}
           label="Total likes"
+          icon="♥"
         />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         <TrendChart
           title="Views this week"
-          data={MOCK_VIEWS_TREND}
+          data={stats?.viewsTrend ?? []}
           xKey="day"
           dataKey="views"
           variant="line"
+          loading={loading}
         />
         <TrendChart
-          title="Subscriber growth"
-          data={MOCK_SUB_TREND}
+          title="New subscribers this week"
+          data={stats?.subscribersTrend ?? []}
           xKey="day"
-          dataKey="subs"
+          dataKey="subscribers"
           variant="area"
+          loading={loading}
         />
       </div>
 
       <div>
-        <h2 className="text-sm text-[#868C99] mb-4">Top performing videos</h2>
-        <TopVideosList videos={topVideos} loading={loading} />
+        <h2 className="mb-4 font-display text-lg">Top performing videos</h2>
+        <TopVideosList videos={videos.slice(0, 5)} loading={loading} />
       </div>
     </div>
   );

@@ -181,7 +181,7 @@ export default function ChannelProfile() {
           </p>
         </div>
 
-        <div className="ml-auto flex items-center gap-3 pb-1">
+        <div className="flex w-full flex-wrap items-center gap-3 pb-1 sm:ml-auto sm:w-auto">
           {isOwner ? (
             <>
               <Link
