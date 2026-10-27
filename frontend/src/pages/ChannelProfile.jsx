@@ -17,13 +17,18 @@ const PAGE_SIZE = 12;
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-function Row({ label, value }) {
-  return (
-    <div className="flex justify-between border-b border-[#2C2F38] pb-3">
-      <dt className="text-[#868C99]">{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
-    </div>
-  );
+function formatNumber(value) {
+  return Number(value ?? 0).toLocaleString();
+}
+
+function formatJoinDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    year: "numeric",
+  }).format(date);
 }
 
 export default function ChannelProfile() {
@@ -148,6 +153,38 @@ export default function ChannelProfile() {
     (String(currentUser._id) === String(profile._id) ||
       currentUser.username === profile.username);
   const displayName = profile.fullName ?? profile.username;
+  const joinedDate = formatJoinDate(profile.createdAt);
+  const channelVideoCount = totalVideos ?? profile.videosCount ?? 0;
+  const aboutStats = [
+    {
+      label: "Subscribers",
+      value: formatNumber(subscribersCount),
+      icon: "◉",
+      accent: "text-[#2DD4BF] bg-[#2DD4BF]/10",
+    },
+    {
+      label: "Videos",
+      value: formatNumber(totalVideos ?? profile.videosCount),
+      icon: "▶",
+      accent: "text-[#8B9CFF] bg-[#8B9CFF]/10",
+    },
+    {
+      label: "Total views",
+      value: formatNumber(profile.totalViews),
+      icon: "↗",
+      accent: "text-[#F6BD60] bg-[#F6BD60]/10",
+    },
+    ...(profile.channelsSubscribedToCount != null
+      ? [
+          {
+            label: "Following",
+            value: formatNumber(profile.channelsSubscribedToCount),
+            icon: "＋",
+            accent: "text-[#F28B82] bg-[#F28B82]/10",
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div>
@@ -291,36 +328,133 @@ export default function ChannelProfile() {
           )}
         </div>
       ) : (
-        <dl className="mt-6 grid gap-4 max-w-md text-sm">
-          <Row label="Username" value={`@${profile.username}`} />
-          <Row label="Subscribers" value={subscribersCount} />
-          {profile.totalViews != null && (
-            <Row
-              label="Total views"
-              value={profile.totalViews.toLocaleString()}
+        <section
+          aria-label={`About ${displayName}`}
+          className="mx-auto mt-6 w-full max-w-5xl space-y-5"
+        >
+          <div className="relative overflow-hidden rounded-2xl border border-[#2C2F38] bg-gradient-to-br from-[#1D292A] via-[#191A20] to-[#191A20] p-5 sm:p-8">
+            <div
+              aria-hidden="true"
+              className="absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#2DD4BF]/10 blur-3xl"
             />
-          )}
-          <Row
-            label="Videos"
-            value={totalVideos ?? profile.videosCount ?? "—"}
-          />
-          {profile.channelsSubscribedToCount != null && (
-            <Row
-              label="Subscribed to"
-              value={profile.channelsSubscribedToCount}
-            />
-          )}
-          {profile.createdAt && (
-            <Row
-              label="Joined"
-              value={new Date(profile.createdAt).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            />
-          )}
-        </dl>
+            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
+              <Avatar
+                user={profile}
+                className="h-20 w-20 shrink-0 text-3xl ring-4 ring-[#F2F3F5]/5 sm:h-24 sm:w-24"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#2DD4BF]">
+                  Channel overview
+                </p>
+                <h2 className="mt-2 truncate font-display text-2xl sm:text-3xl">
+                  {displayName}
+                </h2>
+                <p className="mt-1 text-sm text-[#A2A8B4]">
+                  @{profile.username}
+                </p>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#868C99]">
+                  {joinedDate
+                    ? `Sharing videos with the TubeV community since ${joinedDate}.`
+                    : "A TubeV creator sharing videos with the community."}
+                </p>
+              </div>
+              {joinedDate && (
+                <span className="inline-flex min-h-9 shrink-0 items-center gap-2 self-start rounded-full border border-[#2C2F38] px-3 text-xs text-[#A2A8B4] sm:self-center">
+                  <span aria-hidden="true" className="text-[#2DD4BF]">
+                    ◷
+                  </span>
+                  Joined {joinedDate}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {aboutStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-2xl border border-[#2C2F38] bg-[#191A20] p-4 transition-colors hover:border-[#3A3D47] sm:p-5"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-[#A2A8B4]">{stat.label}</span>
+                  <span
+                    aria-hidden="true"
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl text-base ${stat.accent}`}
+                  >
+                    {stat.icon}
+                  </span>
+                </div>
+                <p className="mt-4 font-display text-3xl tabular-nums tracking-tight">
+                  {stat.value}
+                </p>
+                <p className="mt-1 text-xs text-[#727987]">
+                  {stat.label === "Videos"
+                    ? "Published on this channel"
+                    : stat.label === "Following"
+                      ? "Channels followed"
+                      : stat.label === "Total views"
+                        ? "Across channel videos"
+                        : "People following this channel"}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1.3fr)_minmax(240px,0.7fr)]">
+            <div className="rounded-2xl border border-[#2C2F38] bg-[#191A20] p-5 sm:p-6">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#868C99]">
+                About this channel
+              </p>
+              <h3 className="mt-2 font-display text-xl">
+                {isOwner ? "Your creator space" : `Get to know ${displayName}`}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-[#A2A8B4]">
+                {channelVideoCount
+                  ? `${displayName} has published ${plural(channelVideoCount, "video")} on TubeV. Explore the Videos tab to discover the latest uploads.`
+                  : isOwner
+                    ? "Your channel is ready. Upload your first video and it will appear here for the community."
+                    : `${displayName} hasn't published any videos yet. Check back later for new uploads.`}
+              </p>
+              {channelVideoCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTab("videos")}
+                  className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-[#2DD4BF] transition-colors hover:text-[#54E8D0]"
+                >
+                  Explore videos <span aria-hidden="true">→</span>
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-[#2C2F38] bg-[#191A20] p-5 sm:p-6">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#868C99]">
+                Channel details
+              </p>
+              <dl className="mt-4 divide-y divide-[#2C2F38]">
+                <div className="flex items-center justify-between gap-3 py-3 first:pt-0">
+                  <dt className="text-sm text-[#868C99]">Username</dt>
+                  <dd className="truncate text-sm font-medium">
+                    @{profile.username}
+                  </dd>
+                </div>
+                {joinedDate && (
+                  <div className="flex items-center justify-between gap-3 py-3">
+                    <dt className="text-sm text-[#868C99]">Joined</dt>
+                    <dd className="text-right text-sm font-medium">
+                      {joinedDate}
+                    </dd>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-3 py-3 last:pb-0">
+                  <dt className="text-sm text-[#868C99]">Channel type</dt>
+                  <dd className="rounded-full border border-[#2C2F38] px-2.5 py-1 text-xs text-[#C8CDD6]">
+                    Creator
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </section>
       )}
     </div>
   );
